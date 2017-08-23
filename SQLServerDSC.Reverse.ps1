@@ -4,9 +4,9 @@
 
 .GUID c5d39ceb-c4b0-4a22-b98f-22be7688802a
 
-.AUTHOR Nik Charlebois
+.AUTHOR Microsoft Corporation
 
-.COMPANYNAME Microsoft
+.COMPANYNAME Microsoft Corporation
 
 .EXTERNALMODULEDEPENDENCIES
 
