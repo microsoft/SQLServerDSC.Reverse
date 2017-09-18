@@ -361,7 +361,7 @@ function Set-LCM
 Function Get-SQLInstance 
 {
     [OutputType('SQLServer.Information')]
-    [cmdletbinding()] 
+    [cmdletbinding()]
     Param(
         [parameter(ValueFromPipeline=$True)]
         [string[]]$Computername = 'G13'
