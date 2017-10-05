@@ -36,7 +36,7 @@ $Script:dscConfigContent = ""
 $Script:sqlConnectionInfo = $null
 $DSCSource = "C:\Program Files\WindowsPowerShell\Modules\xSQLServer\"
 $DSCVersion = "7.1.0.0"
-$Script:setupAccount = Get-Credential -Message "Setup Account"
+#$Script:setupAccount = Get-Credential -Message "Setup Account"
 
 try {
     $currentScript = Test-ScriptFileInfo $SCRIPT:MyInvocation.MyCommand.Path
@@ -83,31 +83,32 @@ function Orchestrator
     # Loop through all SQL Instances and extract their DSC information;
     foreach($sqlInstance in $SQLInstances)
     {        
-        $Script:sqlConnectionInfo = Connect-SQL -SQLServer $env:COMPUTERNAME -SQLInstanceName $sqlInstance.Instance
-    
+        $Script:sqlConnectionInfo = Connect-SQL -SQLServer $sqlInstance.sqlserver -SQLInstanceName $sqlInstance.Instance
+    write-host $sqlInstance
+    write-host $sqlinstance.Instance
         Write-Host "["$sqlInstance.Instance"] Scanning SQL Server Memory..." -BackgroundColor DarkGreen -ForegroundColor White
-        Read-SQLMemory -SQLInstanceName $sqlInstance.Instance
+        Read-SQLMemory -SQLServer $sqlinstance.sqlserver -SQLInstanceName $sqlinstance.Instance
 
         Write-Host "["$sqlInstance.Instance"] Scanning SQL Server Database(s)..." -BackgroundColor DarkGreen -ForegroundColor White
-        Read-SQLDatabase -SQLServer $env:COMPUTERNAME -SQLInstanceName $sqlInstance.Instance
+        Read-SQLDatabase -SQLServer $sqlinstance.sqlserver -SQLInstanceName $sqlInstance.Instance
 
         Write-Host "["$sqlInstance.Instance"] Scanning SQL Server Configuration Option(s)..." -BackgroundColor DarkGreen -ForegroundColor White
-        Read-SQLConfiguration -SQLServer $env:COMPUTERNAME -SQLInstanceName $sqlInstance.Instance
+        Read-SQLConfiguration -SQLServer $sqlinstance.sqlserver -SQLInstanceName $sqlInstance.Instance
 
         Write-Host "["$sqlInstance.Instance"] Scanning SQL Server Login(s)..." -BackgroundColor DarkGreen -ForegroundColor White
-        Read-SQLLogin -SQLServer $env:COMPUTERNAME -SQLInstanceName $sqlInstance.Instance
+        Read-SQLLogin -SQLServer $sqlinstance.sqlserver -SQLInstanceName $sqlInstance.Instance
 
         Write-Host "["$sqlInstance.Instance"] Scanning SQL Server Maximum Degree of Parallelism..." -BackgroundColor DarkGreen -ForegroundColor White
-        Read-SQLMaxDop -SQLServer $env:COMPUTERNAME -SQLInstanceName $sqlInstance.Instance
+        Read-SQLMaxDop -SQLServer $sqlinstance.sqlserver -SQLInstanceName $sqlInstance.Instance
 
         Write-Host "["$sqlInstance.Instance"] Scanning SQL Server Network Protocol(s)..." -BackgroundColor DarkGreen -ForegroundColor White
-        Read-SQLNetwork -SQLInstanceName $sqlInstance.Instance
+        Read-SQLNetwork -SQLServer $sqlinstance.sqlserver -SQLInstanceName $sqlInstance.Instance
 
         Write-Host "["$sqlInstance.Instance"] Scanning SQL Always On Service..." -BackgroundColor DarkGreen -ForegroundColor White
-        Read-SQLAlwaysOnService -SQLInstanceName $sqlInstance.Instance
+        Read-SQLAlwaysOnService -SQLServer $sqlinstance.sqlserver -SQLInstanceName $sqlInstance.Instance
 
         Write-Host "["$sqlInstance.Instance"] Scanning SQL Always On Availability Group(s)..." -BackgroundColor DarkGreen -ForegroundColor White
-        Read-SQLAlwaysOnAvailabilityGroup -SQLInstanceName $sqlInstance.Instance
+        Read-SQLAlwaysOnAvailabilityGroup -SQLServer $sqlinstance.sqlserver -SQLInstanceName $sqlInstance.Instance
     }
     Write-Host "Scanning Requirement(s)..."
     Read-SQLAOGroupEnsure
@@ -132,8 +133,8 @@ function Read-SQLMemory($SQLInstanceName)
     $params = Get-DSCFakeParameters -ModulePath $module
     
     # Setting Primary Keys
-    $params.SQLInstanceName = $SQLInstanceName
-    $params.SQLServer = $env:COMPUTERNAME
+    $params.SQLInstanceName = $SQLInstance.Instance
+    $params.SQLServer = $SQLInstance.sqlserver
 
     $results = Get-TargetResource @params    
 
@@ -153,7 +154,7 @@ function Read-SQLAOGroupEnsure()
     {
         # Setting Primary Keys
         $params.AvailabilityGroupName = $availabilityGroup.Name
-        $params.SetupCredential = $Script:setupAccount
+     #   $params.SetupCredential = $Script:setupAccount
 
         $results = Get-TargetResource @params
 
@@ -174,8 +175,8 @@ function Read-SQLAlwaysOnAvailabilityGroup($SQLInstanceName)
     {
         # Setting Primary Keys
         $params.Name = $availabilityGroup.Name
-        $params.SQLServer = $env:COMPUTERNAME
-        $params.SQLInstanceName = $SQLInstanceName
+        $params.SQLInstanceName = $SQLInstance.Instance
+        $params.SQLServer = $SQLInstance.sqlserver
 
         $results = Get-TargetResource @params
 
@@ -193,12 +194,12 @@ function Read-SQLAlwaysOnService($SQLInstanceName)
     $params = Get-DSCFakeParameters -ModulePath $module
     
     # Setting Primary Keys
-    $params.SQLServer = $env:COMPUTERNAME
-    $params.SQLInstanceName = $SQLInstanceName
+    $params.SQLInstanceName = $SQLInstance.Instance
+    $params.SQLServer = $SQLInstance.sqlserver
 
     $results = Get-TargetResource @params    
-    $results.Add("SQLServer", $env:COMPUTERNAME)
-    $results.Add("SQLInstanceName", $SQLInstanceName)
+    $results.Add("SQLServer", $SQLInstance.sqlserver)
+    $results.Add("SQLInstanceName", $SQLInstance.Instance)
 
     # WA - Get-TargetResource doesn't return the proper values, so we need to work around it;
     if($null -ne $results.Get_Item("IsHadrEnabled"))
@@ -227,8 +228,8 @@ function Read-SQLConfiguration($SQLServer, $SQLInstanceName)
     $params = Get-DSCFakeParameters -ModulePath $module
     
     # Setting Primary Key SQLInstanceName
-    $params.SQLInstanceName = $SQLInstanceName
-    $params.SQLServer = $env:COMPUTERNAME
+    $params.SQLInstanceName = $SQLInstance.Instance
+    $params.SQLServer = $SQLInstance.sqlserver
 
     $options = $Script:sqlConnectionInfo.Configuration.Properties
 
@@ -499,6 +500,8 @@ Function Get-SQLInstance
                             $WMIResults = Get-WMIObject @WMIParams 
                             $GroupResults = $WMIResults | Group ServiceName
                             $PropertyHash['Instance'] = $GroupResults.Name
+                            if ($PropertyHash.Instance -like "MSSQL$*")
+                            {$PropertyHash['Instance'] = $PropertyHash['Instance'].SubString(6)}
                             $WMIResults | ForEach {
                                 $Name = "{0}{1}" -f ($_.PropertyName.SubString(0,1),$_.PropertyName.SubString(1).ToLower())    
                                 $Data = If ($_.PropertyStrValue) {
@@ -560,10 +563,12 @@ Function Get-SQLInstance
                         $PropertyHash['SqlServer'] = $Computer
                     }
                     $PropertyHash['FullName'] = ("{0}\{1}" -f $Name,$PropertyHash['Instance'])
-                    #emdregion Full SQL Name                        
+                    #emdregion Full SQL Name
+                    Write-Host $sqlInstance                        
                     $Object = [pscustomobject]$PropertyHash
                     $Object.pstypenames.insert(0,'SQLServer.Information')
                     $Object
+                    write-host $sqlInstance
                 }#FOREACH INSTANCE                 
             }#IF
         }
@@ -577,8 +582,8 @@ function Get-ReverseDSC()
     Orchestrator
 
     <## Prompts the user to specify the FOLDER path where the resulting PowerShell DSC Configuration Script will be saved. #>
-    $fileName = "SQLServer.DSC.ps1"
-    $OutputDSCPath = Read-Host "Please enter the full path of the output folder for DSC Configuration (will be created as necessary)"
+      $fileName = "SQLServer.DSC.ps1"
+      $OutputDSCPath = Read-Host "Please enter the full path of the output folder for DSC Configuration (will be created as necessary)"
     
     <## Ensures the specified output folder path actually exists; if not, tries to create it and throws an exception if we can't. ##>
     while (!(Test-Path -Path $OutputDSCPath -PathType Container -ErrorAction SilentlyContinue))
