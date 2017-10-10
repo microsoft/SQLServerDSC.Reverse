@@ -1,6 +1,6 @@
 <#PSScriptInfo
 
-.VERSION 1.0.0.0
+.VERSION 1.1.0.0
 
 .GUID c5d39ceb-c4b0-4a22-b98f-22be7688802a
 
@@ -17,7 +17,7 @@
 * Initial Release;
 #>
 
-#Requires -Modules @{ModuleName="ReverseDSC";ModuleVersion="1.7.3.0"},@{ModuleName="xSQLServer";ModuleVersion="7.1.0.0"}
+#Requires -Modules @{ModuleName="ReverseDSC";ModuleVersion="1.9.1.0"},@{ModuleName="xSQLServer";ModuleVersion="8.2.0.0"}
 
 <# 
 
@@ -35,7 +35,7 @@ $VerbosePreference = "SilentlyContinue"
 $Script:dscConfigContent = ""
 $Script:sqlConnectionInfo = $null
 $DSCSource = "C:\Program Files\WindowsPowerShell\Modules\xSQLServer\"
-$DSCVersion = "7.1.0.0"
+$DSCVersion = "8.2.0.0"
 #$Script:setupAccount = Get-Credential -Message "Setup Account"
 
 try {
